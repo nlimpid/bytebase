@@ -416,10 +416,11 @@ const workspaceLevelRoutes: RouteObject[] = [
         ),
       },
       {
+        // Setup instructions only. The endpoint comes from actuator info the
+        // caller already has, so this must not demand bb.settings.get.
         path: "mcp",
         handle: {
           name: WORKSPACE_ROUTE_MCP,
-          requiredPermissionList: (): Permission[] => ["bb.settings.get"],
         },
         lazy: lazyPage(
           () => import("@/routes/workspace/MCPPage"),
