@@ -1,6 +1,6 @@
 import { matchRoutes, type RouteObject } from "react-router";
 import { describe, expect, it } from "vitest";
-import { WORKSPACE_ROUTE_404 } from "@/app/router/handles";
+import { WORKSPACE_ROUTE_404, WORKSPACE_ROUTE_MCP } from "@/app/router/handles";
 import { routes } from "./routes";
 
 // Guardrail for the "blank body" route bug class. During the Vue→React router
@@ -65,6 +65,30 @@ function collectBareLeaves(
   }
   return bare;
 }
+
+describe("MCP integration route", () => {
+  it("does not require settings access to open the setup page", () => {
+    // Same aggregation `assembleRoute` feeds to RoutePermissionGuardShell:
+    // every matched handle's requiredPermissionList, deduped.
+    const matches = matchRoutes(routes, "/integration/mcp") ?? [];
+    const leafHandle = matches.at(-1)?.route.handle as
+      | { name?: string }
+      | undefined;
+    const requiredPermissions = [
+      ...new Set(
+        matches.flatMap((match) => {
+          const handle = match.route.handle as
+            | { requiredPermissionList?: () => string[] }
+            | undefined;
+          return handle?.requiredPermissionList?.() ?? [];
+        })
+      ),
+    ];
+
+    expect(leafHandle?.name).toBe(WORKSPACE_ROUTE_MCP);
+    expect(requiredPermissions).toEqual([]);
+  });
+});
 
 describe("react route table reachability", () => {
   it("every leaf route renders something or redirects (no blank-body bare leaves)", () => {
