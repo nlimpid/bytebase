@@ -141,6 +141,35 @@ func TestListDatabases_WorkspaceForbiddenFallsBackToProjects(t *testing.T) {
 	}, *calls)
 }
 
+func TestListDatabases_WorkspaceForbiddenNoProjectsKeepsDenial(t *testing.T) {
+	s, calls := captureListCalls(t, func(w http.ResponseWriter, call capturedListCall) {
+		switch {
+		case strings.Contains(call.path, "DatabaseService/ListDatabases") && strings.HasPrefix(call.parent, "workspaces/"):
+			w.WriteHeader(http.StatusForbidden)
+			_ = json.NewEncoder(w).Encode(map[string]any{"message": "permission denied", "code": "PERMISSION_DENIED"})
+		case strings.Contains(call.path, "ProjectService/SearchProjects"):
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(map[string]any{"projects": []any{}})
+		default:
+			t.Errorf("unexpected request path %s parent %s", call.path, call.parent)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	})
+
+	_, err := s.listDatabases(testContext(), `name.contains("app")`, "")
+	require.Error(t, err)
+
+	var te *toolError
+	require.ErrorAs(t, err, &te)
+	require.Equal(t, "PERMISSION_DENIED", te.Code)
+	require.Contains(t, te.Message, "list databases in this workspace")
+	require.Contains(t, te.Suggestion, "bb.databases.list")
+	require.Equal(t, []capturedListCall{
+		{path: "/bytebase.v1.DatabaseService/ListDatabases", parent: "workspaces/wk-test"},
+		{path: "/bytebase.v1.ProjectService/SearchProjects", parent: ""},
+	}, *calls)
+}
+
 func TestListDatabases_WorkspaceSuccessSkipsFallback(t *testing.T) {
 	s, calls := captureListCalls(t, func(w http.ResponseWriter, call capturedListCall) {
 		require.Contains(t, call.path, "DatabaseService/ListDatabases")

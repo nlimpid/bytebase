@@ -101,7 +101,7 @@ func (s *Server) listDatabases(ctx context.Context, filter, project string) ([]d
 	if !errors.As(err, &te) || te.Code != "PERMISSION_DENIED" {
 		return nil, err
 	}
-	return s.listDatabasesForVisibleProjects(ctx, filter)
+	return s.listDatabasesForVisibleProjects(ctx, filter, err)
 }
 
 func (s *Server) listDatabasesUnderParent(ctx context.Context, parent, filter string) ([]databaseEntry, error) {
@@ -208,10 +208,15 @@ func (s *Server) listVisibleProjects(ctx context.Context) ([]projectEntry, error
 	return projects, nil
 }
 
-func (s *Server) listDatabasesForVisibleProjects(ctx context.Context, filter string) ([]databaseEntry, error) {
+func (s *Server) listDatabasesForVisibleProjects(ctx context.Context, filter string, workspaceDenied error) ([]databaseEntry, error) {
 	projects, err := s.listVisibleProjects(ctx)
 	if err != nil {
 		return nil, err
+	}
+	// No visible project means the caller still lacks bb.databases.list.
+	// An empty slice would surface as DATABASE_NOT_FOUND.
+	if len(projects) == 0 {
+		return nil, workspaceDenied
 	}
 
 	var databases []databaseEntry
